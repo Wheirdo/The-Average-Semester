@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <link rel="stylesheet" href="/style.css">
+    </head>
+    <body>
+        <div class="body-text">
+            <div class="container">
+                
+                <!--Checkmark buttons, generated with Javascript-->
+                <div class="buttons" id="scheduleButtons"></div>
+
+                <div class="schedule">
+                    <img id="backgroundImage" class="background" src="background.png" />
+                </div>
+
+            </div>
+        </div>
+
+
+        <script>
+        //Start of Javascript
+        const container = document.getElementById("scheduleButtons");
+        const numberOfSchedules = 8;
+        const scheduleImages = [
+            "heatmap/schedule1.png",
+            "heatmap/schedule2.png",
+            "heatmap/schedule3.png",
+            "heatmap/schedule4.png",
+            "heatmap/schedule5.png",
+            "heatmap/schedule6.png",
+            "heatmap/schedule7.png",
+            "heatmap/schedule8.png",
+        ];
+
+
+        //Keeps track of selected schedules
+        const selectedSchedules = [];
+
+        //Names of the schedules (for the checkboxes)
+        const scheduleNames =  ["Freshman Fall", "Freshman Spring",
+                                "Sophomore Fall", "Sophomore Spring",
+                                "Junior Fall", "Junior Spring",
+                                "Senior Fall", "Senior Spring"
+        ]
+
+                            
+        //Generate checkboxes and put them inside of "scheduleButtons"
+        for (let i = 1; i <= numberOfSchedules; i++) {
+            const a_checkbox = document.createElement("input");
+
+            a_checkbox.type = "checkbox";
+            a_checkbox.id = `image${i}`;
+            a_checkbox.addEventListener("change", function() {
+                updateSelectedSchedules(i, a_checkbox.checked);
+            });
+
+            const label = document.createElement("label");
+            label.htmlFor = `image${i}`;
+            label.textContent = scheduleNames[i-1];
+            label.style.fontFamily = "Georgia";
+            label.style.fontSize = '30px';
+
+            container.appendChild(a_checkbox);
+            container.appendChild(label);
+            container.appendChild(document.createElement("br"));
+            container.appendChild(document.createElement("br"));
+            if (i % 2 == 0) {
+                container.appendChild(document.createElement("br"));
+                container.appendChild(document.createElement("br"));
+            }
+        }
+
+
+
+        //Updates list of schedules everytime a checkbox is clicked
+        function updateSelectedSchedules(scheduleNumber, isChecked) {
+            if (isChecked) {
+                selectedSchedules.push(scheduleNumber);
+            }
+            else {
+                const index = selectedSchedules.indexOf(scheduleNumber);
+                if (index !== -1) {
+                    selectedSchedules.splice(index, 1);
+                }
+            }
+
+            updateImageSource();
+        }
+
+        //Blends two schedules together
+        async function blendImages(baseImage, overlayImage, layers) {
+            // Wait for both images to load
+            await Promise.all([
+                new Promise(resolve => { baseImage.onload = resolve; }),
+                new Promise(resolve => { overlayImage.onload = resolve; })
+            ]);
+
+            //Create and Load a canvas for Base Image
+            const canvas = document.createElement('canvas');
+            canvas.width = baseImage.width;
+            canvas.height = baseImage.height;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(baseImage, 0, 0);
+
+            const baseImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const baseData = baseImageData.data;
+
+
+            //Create and Load a canvase for Overlay Image
+            const overlayCanvas = document.createElement('canvas');
+            overlayCanvas.width = baseImage.width;
+            overlayCanvas.height = baseImage.height;
+
+            const overlayCtx = overlayCanvas.getContext('2d');
+            overlayCtx.drawImage(overlayImage, 0, 0);
+
+            const overlayImageData = overlayCtx.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
+            const overlayData = overlayImageData.data;
+
+
+            //This makes the heatmap more "interactive"
+            //If only 1 schedule is on the screen, it's the brightest color
+            //If there are 2, their overlap is the brightest, and so on
+            //It's capped at 6 because my schedule has no time where
+            //  I have 7 or more classes at one time
+            if (layers > 6) {
+                layers = 6;
+            }
+            const green = 200 / layers;
+            const blue = 125 / layers;
+
+            //Blend the overlay image onto the base image
+            for (let i = 0; i < baseData.length; i += 4) {
+                if (overlayData[i + 3] >= 250) {
+                
+                    //baseData[i + 0] += 0;
+                    baseData[i + 1] += green;
+                    baseData[i + 2] += blue;
+                    baseData[i + 3] += 255;
+                }
+            }
+
+            //Update the canvas with the blended result
+            ctx.putImageData(baseImageData, 0, 0);
+
+            return canvas.toDataURL();
+        }
+
+
+        //Puts the final schedule on top of the background.png
+        async function combineImages(baseImage, overlayImage) {
+            //Wait for both images to load
+            await Promise.all([
+                new Promise(resolve => { baseImage.onload = resolve; }),
+                new Promise(resolve => { overlayImage.onload = resolve; })
+            ]);
+
+            //Create and Load a canvas for Base Image
+            const canvas = document.createElement('canvas');
+            canvas.width = baseImage.width;
+            canvas.height = baseImage.height;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(baseImage, 0, 0);
+
+            const baseImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const baseData = baseImageData.data;
+
+
+            //Create and Load a canvase for Overlay Image
+            const overlayCanvas = document.createElement('canvas');
+            overlayCanvas.width = baseImage.width;
+            overlayCanvas.height = baseImage.height;
+
+            const overlayCtx = overlayCanvas.getContext('2d');
+            overlayCtx.drawImage(overlayImage, 0, 0);
+
+            const overlayImageData = overlayCtx.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
+            const overlayData = overlayImageData.data;
+
+            //Blending, but with Alpha values
+            //baseData[i] = baseData[i] * (1 - alpha) + overlayData[i] * alpha;
+            for (let i = 0; i < baseData.length; i += 4) {
+                if (overlayData[i + 3] >= 250) {
+                    //Alpha = 1
+                    //baseData[i + 0] = overlayData[i + 0];
+                    baseData[i + 1] = overlayData[i + 1];
+                    baseData[i + 2] = overlayData[i + 2];
+                }
+                //Else, no color is added
+            }
+
+            //Update the canvas with the blended result
+            ctx.putImageData(baseImageData, 0, 0);
+
+            return canvas.toDataURL();
+        }
+
+
+
+
+        const backgroundStyles = getComputedStyle(document.querySelector('.background'));
+
+        //Updates the image source based on the selected schedules
+        //Called whenever a checkbox is clicked
+        async function updateImageSource() {
+            const backgroundImage = document.getElementById("backgroundImage");
+
+            //Show this picture while this code is chugging
+            // Needed because 1) theses files are huge and 2) the blending is super ineffienct
+            backgroundImage.src= "loading.png";
+
+
+            const scheduleContainer = document.querySelector(".schedule");
+            const combinedImageSrc = selectedSchedules.map(scheduleNumber => scheduleImages[scheduleNumber - 1]);
+            const existingImages = Array.from(scheduleContainer.querySelectorAll('img'));
+
+            const baseImage = new Image();
+            if (combinedImageSrc.length != 0) {
+                baseImage.src = combinedImageSrc[0];
+
+                const overlayImage = new Image();
+                overlayImage.src = combinedImageSrc[0];
+
+                //Blend it with itself so that the color is the brighest green
+                //Explained more in the layers section of blendImages
+                await blendImages(baseImage, overlayImage, combinedImageSrc.length).then(result => {
+                    baseImage.src = result;
+                });
+            }
+            else {
+                baseImage.src = "background.png";
+            }
+
+
+            if (combinedImageSrc.length > 1) {
+                // Blend the selected schedule images onto the base image
+                for (let i = 1; i < combinedImageSrc.length; i++) {
+                    const overlayImage = new Image();
+                    overlayImage.src = combinedImageSrc[i];
+
+                    await blendImages(baseImage, overlayImage, combinedImageSrc.length).then(result => {
+                        baseImage.src = result;
+                    });
+                }
+            }
+
+            const the_background = new Image();
+            the_background.src = "background.png";
+
+            //Now, combine it with the background
+            //Combine =!= blending - combineImages here just puts the baseImage
+            // ontop of the background using alpha values
+            await combineImages(the_background, baseImage).then(result => {
+                baseImage.src = result;
+            });
+
+
+            //Finally, update the picture displayed
+            backgroundImage.src = baseImage.src;
+
+
+            //Remove images that are no longer in scheduleImages
+            existingImages.forEach(img => {
+                if (img.id !== "backgroundImage") {
+                    img.parentNode.removeChild(img);
+                }
+            });
+        }
+        </script>
+    </body>
+</html>

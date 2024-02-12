@@ -1,0 +1,24 @@
+
+.container {
+    display: flex;
+}
+
+.buttons {
+    width: 30%;
+}
+
+.schedule {
+    top: 0;
+    left: 0;
+
+    position: relative;
+    width: 100%;
+}
+
+.background {
+    top: 0;
+    left: 0;
+
+    position: absolute;
+    width: 90%;
+}

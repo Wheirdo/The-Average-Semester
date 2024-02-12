@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <link rel="stylesheet" href="/style.css">
+    </head>
+    <body>
+        <div class="body-text">
+            <div class="container">
+                <div class="buttons" id="scheduleButtons"></div>
+
+                <div class="schedule">
+                    <img id="backgroundImage" class="background" src="background.png" />
+                </div>
+
+            </div>
+        </div>
+
+
+        <script>
+        //Start of Javascript
+        const container = document.getElementById("scheduleButtons");
+        const numberOfSchedules = 8;
+        const scheduleImages = [
+            "colors/schedule1.png",
+            "colors/schedule2.png",
+            "colors/schedule3.png",
+            "colors/schedule4.png",
+            "/colors/schedule5.png",
+            "colors/schedule6.png",
+            "colors/schedule7.png",
+            "colors/schedule8.png",
+        ];
+
+
+        //Keeps track of selected schedules
+        const selectedSchedules = [];
+
+        //Names of the schedules (for the checkboxes)
+        const scheduleNames =  ["Freshman Fall", "Freshman Spring",
+                                "Sophomore Fall", "Sophomore Spring",
+                                "Junior Fall", "Junior Spring",
+                                "Senior Fall", "Senior Spring"
+        ]
+
+                            
+        //Generate checkboxes and put them inside of "scheduleButtons"
+        for (let i = 1; i <= numberOfSchedules; i++) {
+            const a_checkbox = document.createElement("input");
+
+            a_checkbox.type = "checkbox";
+            a_checkbox.id = `image${i}`;
+            a_checkbox.addEventListener("change", function() {
+                updateSelectedSchedules(i, a_checkbox.checked);
+            });
+
+
+
+            const label = document.createElement("label");
+            label.htmlFor = `image${i}`;
+            label.textContent = scheduleNames[i-1];
+            label.style.fontFamily = "Georgia";
+            label.style.fontSize = '30px';
+
+            container.appendChild(a_checkbox);
+            container.appendChild(label);
+            container.appendChild(document.createElement("br"));
+            container.appendChild(document.createElement("br"));
+            if (i % 2 == 0) {
+                container.appendChild(document.createElement("br"));
+                container.appendChild(document.createElement("br"));
+            }
+        }
+
+
+
+        //Updates selectedSchedules everytime a checkbox is clicked
+        //Then, calls updateImageSource
+        function updateSelectedSchedules(scheduleNumber, isChecked) {
+            if (isChecked) {
+                selectedSchedules.push(scheduleNumber);
+            }
+            else {
+                const index = selectedSchedules.indexOf(scheduleNumber);
+                if (index !== -1) {
+                    selectedSchedules.splice(index, 1);
+                }
+            }
+
+            updateImageSource();
+        }
+
+
+        const backgroundStyles = getComputedStyle(document.querySelector('.background'));
+
+        //Updates the image source based on the selected schedules
+        //Called whenever a checkbox is clicked
+        function updateImageSource() {
+            const backgroundImage = document.getElementById("backgroundImage");
+            backgroundImage.src = "background.png";
+
+
+            const scheduleContainer = document.querySelector(".schedule");
+            const combinedImageSrc = selectedSchedules.map(scheduleNumber => scheduleImages[scheduleNumber - 1]);
+
+            // Get existing image elements
+            const existingImages = Array.from(scheduleContainer.querySelectorAll('img'));
+
+            // Display selected schedule images on top of the background
+            combinedImageSrc.forEach(src => {
+                const existingImage = existingImages.find(img => img.src === src);
+
+                if (existingImage) {
+                    // Image already exists, remove from existingImages
+                    existingImages.splice(existingImages.indexOf(existingImage), 1);
+                } 
+                else {
+                    // Image does not exist, create a new one
+                    const img = new Image();
+                    img.src = src;
+
+                    img.style.top = backgroundStyles.top;
+                    img.style.left = backgroundStyles.left;
+                    img.style.position = backgroundStyles.position;
+                    img.style.width = backgroundStyles.width;
+
+                    scheduleContainer.appendChild(img);
+                }
+            });
+
+            // Remove images that are no longer in scheduleImages
+            existingImages.forEach(img => {
+                if (img.id !== "backgroundImage") {
+                    img.parentNode.removeChild(img);
+                }
+            });
+        }
+        </script>
+    </body>
+</html>
