@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <link rel="stylesheet" href="/style.css">
+    </head>
+    <body>
+        <div class="body-text">
+            <div class="container">
+                
+                <div class="buttons" id="scheduleButtons"></div>
+                <div class="buttons" id="heatmap"></div>
+
+                <div class="schedule">
+                    <img id="backgroundImage" class="background" src="background.png" />
+                </div>
+
+            </div>
+        </div>
+
+
+        <script>
+        //Start of Javascript
+        const container = document.getElementById("scheduleButtons");
+        const scheduleImages = [
+            "schedules/schedule1.png",
+            "schedules/schedule2.png",
+            "schedules/schedule3.png",
+            "schedules/schedule4.png",
+            "schedules/schedule5.png",
+            "schedules/schedule6.png",
+            "schedules/schedule7.png",
+            "schedules/schedule8.png",
+        ];
+        const allScheduleImages = scheduleImages.map(src => {
+            const img = new Image();
+            img.src = src;
+            return img;
+        });
+
+        const backgroundElement = document.getElementById("backgroundImage");
+        const originalBackground = new Image();
+        originalBackground.src = backgroundElement.src;
+
+        //Load all the images
+        function waitForImage(img) {
+            if (img.complete && img.naturalWidth !== 0) {
+                return Promise.resolve();
+            }
+            return new Promise(resolve => {
+                img.onload = resolve;
+                img.onerror = resolve;
+            });
+        }
+
+        async function preloadAllImages() {
+            const allImages = [...allScheduleImages, backgroundElement, originalBackground];
+            await Promise.all(allImages.map(waitForImage));
+        }
+
+        let width = 0;
+        let height = 0;
+        let layerCount;
+        let initialized = false;
+
+        const red = 6;
+        const green = 200;
+        const blue = 125;
+
+        async function initialize() {
+            await preloadAllImages();
+            width = backgroundElement.naturalWidth;
+            height = backgroundElement.naturalHeight;
+            layerCount = new Uint8Array(width * height);
+            layerCount.fill(0);
+
+            initialized = true;
+        }
+        initialize();
+
+
+        //Keeps track of selected schedules
+        const selectedSchedules = [];
+
+        //Names of the schedules (for the checkboxes)
+        const scheduleNames =  ["Freshman Fall", "Freshman Spring",
+                                "Sophomore Fall", "Sophomore Spring",
+                                "Junior Fall", "Junior Spring",
+                                "Senior Fall", "Senior Spring"
+        ]
+
+                            
+        //Generate checkboxes and put them inside of "scheduleButtons"
+        const numberOfSchedules = scheduleImages.length;
+
+        for (let i = 1; i <= numberOfSchedules; i++) {
+            const a_checkbox = document.createElement("input");
+
+            a_checkbox.type = "checkbox";
+            a_checkbox.id = `image${i}`;
+            a_checkbox.addEventListener("change", function() {
+                updateSelectedSchedules(i, a_checkbox.checked);
+            });
+
+            const label = document.createElement("label");
+            label.htmlFor = `image${i}`;
+            label.textContent = scheduleNames[i-1];
+            label.style.fontFamily = "Georgia";
+            label.style.fontSize = '30px';
+
+            container.appendChild(a_checkbox);
+            container.appendChild(label);
+            container.appendChild(document.createElement("br"));
+            container.appendChild(document.createElement("br"));
+            if (i % 2 == 0) {
+                container.appendChild(document.createElement("br"));
+                container.appendChild(document.createElement("br"));
+            }
+        }
+
+        const heatmap_checkbox = document.createElement("input");
+        let isHeatmapActive = false;
+        heatmap_checkbox.type = "checkbox";
+        heatmap_checkbox.addEventListener("change", function() {
+            toggleHeatmap(heatmap_checkbox.checked);
+        });
+
+        async function toggleHeatmap(isChecked) {
+            isHeatmapActive = isChecked;
+
+            if (isHeatmapActive == true) {
+                await renderHeatmap();
+            }
+            else {
+                await renderColor();
+            }
+        }
+
+        const heatmapLabel = document.createElement("label");
+        heatmapLabel.textContent =  "Heatmap";
+        heatmapLabel.style.fontFamily = "Georgia";
+        heatmapLabel.style.fontSize = '30px';
+
+        container.appendChild(heatmap_checkbox);
+        container.appendChild(heatmapLabel);
+        container.appendChild(document.createElement("br"));
+        container.appendChild(document.createElement("br"));
+
+        //Updates list of schedules everytime a checkbox is clicked
+        async function updateSelectedSchedules(scheduleNumber, isChecked) {
+            if (isChecked) {
+                selectedSchedules.push(scheduleNumber);
+            }
+            else {
+                const index = selectedSchedules.indexOf(scheduleNumber);
+                if (index !== -1) {
+                    selectedSchedules.splice(index, 1);
+                }
+            }
+
+
+            await updateLayerCount(scheduleNumber, isChecked);
+            if (isHeatmapActive == true) {
+                await renderHeatmap();
+            }
+            else {
+                await renderColor();
+            }
+        }
+
+        async function updateLayerCount(scheduleNumber, wasAdded) {
+            let update = -1
+            if (wasAdded == true) {
+                update = 1;
+            }
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = width;
+            tempCanvas.height = height;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            const scheduleImage = allScheduleImages[scheduleNumber - 1];
+            await waitForImage(scheduleImage);
+
+            tempCtx.clearRect(0, 0, width, height);
+            tempCtx.drawImage(scheduleImage, 0, 0, width, height);
+            const overlayData = tempCtx.getImageData(0, 0, width, height).data;
+
+            for (let y = 0, p = 0; y < height; y++) {
+                for (let x = 0; x < width; x++, p++) {
+                    const alpha = overlayData[(p * 4) + 3];
+                    if (alpha >= 250) {
+                        layerCount[p] = layerCount[p] + update;
+                    }
+                }
+            }
+
+            return;
+        }
+
+        async function renderHeatmap() {
+            const overlayCanvas = document.createElement('canvas');
+            overlayCanvas.width = width;
+            overlayCanvas.height = height;
+
+            const overlayCtx = overlayCanvas.getContext('2d');
+            const overlayImageData = overlayCtx.createImageData(width, height);
+            const overlayPixels = overlayImageData.data;
+            
+            //It's capped at 6 because my schedule has no time where more than 6 classes overlap
+            let maxLayers = selectedSchedules.length;
+            if (selectedSchedules.length > 6) {
+                maxLayers = 6;
+            }
+
+            //Pre-compute the blended heatmap based on layerCount
+            const colors = [];
+            for (let c = 0; c < maxLayers; c++) {
+                let this_Red   = (red   / maxLayers) * (c+1);
+                let this_Green = (green / maxLayers) * (c+1);
+                let this_Blue  = (blue  / maxLayers) * (c+1);
+
+                colors[c] = [this_Red, this_Green, this_Blue];
+            }
+
+            for (let i = 0; i < layerCount.length; i++) {
+                const count = layerCount[i];
+
+                if (count <= 0) {
+                    //Skip pixels with no layers
+                    continue; 
+                }
+
+                const pixelIndex = i * 4;
+                overlayPixels[pixelIndex + 0] = colors[count - 1][0];
+                overlayPixels[pixelIndex + 1] = colors[count - 1][1];
+                overlayPixels[pixelIndex + 2] = colors[count - 1][2];
+                overlayPixels[pixelIndex + 3] = 255;
+            }
+
+            //Update the canvas with the rendered result
+            overlayCtx.putImageData(overlayImageData, 0, 0);
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            //Draw the original background first, then overlay the blended schedules on top.
+            ctx.drawImage(originalBackground, 0, 0);
+            ctx.drawImage(overlayCanvas, 0, 0);
+            ctx.globalAlpha = 1;
+            backgroundElement.src = canvas.toDataURL();
+        }
+
+        async function renderColor() {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            // Draw the base background first.
+            ctx.drawImage(originalBackground, 0, 0, width, height);
+
+            // Draw each selected schedule image on top of the background.
+            for (const scheduleNumber of selectedSchedules) {
+                const scheduleImage = allScheduleImages[scheduleNumber - 1];
+                await waitForImage(scheduleImage);
+                ctx.drawImage(scheduleImage, 0, 0, width, height);
+            }
+
+            backgroundElement.src = canvas.toDataURL();
+        }
+
+        </script>
+    </body>
+</html>

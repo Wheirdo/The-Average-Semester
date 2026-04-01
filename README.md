@@ -19,10 +19,4 @@ During my last semester at A&M, I had a simple question: "What if I made a heatm
 
 While I think it turned out great, it doesn't work well as a data visualization tool unless you have the ability to click through the layers to see more detail.
 So I made an HTML page for the color version and the heatmap version, and with some Javascript, was able to recreate the effect.
-You can also see it in action on my personal website here: https://people.tamu.edu/~andywheir/projects/schedule/
-
-![A picture of a website, with layers of colored schedules](https://github.com/Wheirdo/The-Average-Semester/assets/102169383/13898388-44cc-4ed5-b21b-05f045b2b803)
-*An example of the color.html's output, as seen on my website*
-
-![A picture of a website, with a green heatmap of scheduless](https://github.com/Wheirdo/The-Average-Semester/assets/102169383/6bace2f9-c6cb-4616-9803-4c70492339d5)
-*An example of the heatmap.html's output, as seen on my website*
+I'm currently working on re-vamping this project. Stay tuned for a V2!
