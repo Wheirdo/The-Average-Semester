@@ -1,14 +1,14 @@
 <!DOCTYPE html>
+<meta charset="UTF-8">
 <html lang="en">
     <head>
-        <link rel="stylesheet" href="/style.css">
+        <link rel="stylesheet" href="style.css">
     </head>
     <body>
         <div class="body-text">
             <div class="container">
                 
-                <div class="buttons" id="scheduleButtons"></div>
-                <div class="buttons" id="heatmap"></div>
+                <div class="buttons" id="allButtons"></div>
 
                 <div class="schedule">
                     <img id="backgroundImage" class="background" src="background.png" />
@@ -17,11 +17,13 @@
             </div>
         </div>
 
+        
 
         <script>
-        //Start of Javascript
-        const container = document.getElementById("scheduleButtons");
-        const scheduleImages = [
+        //
+        // Constants
+        //
+        const schedule_directories = [
             "schedules/schedule1.png",
             "schedules/schedule2.png",
             "schedules/schedule3.png",
@@ -31,17 +33,26 @@
             "schedules/schedule7.png",
             "schedules/schedule8.png",
         ];
-        const allScheduleImages = scheduleImages.map(src => {
+        const all_schedule_images = schedule_directories.map(src => {
             const img = new Image();
             img.src = src;
             return img;
         });
 
-        const backgroundElement = document.getElementById("backgroundImage");
-        const originalBackground = new Image();
-        originalBackground.src = backgroundElement.src;
+        const rendered_schedule = document.getElementById("backgroundImage");
+        const original_background = new Image();
+        original_background.src = rendered_schedule.src;
 
-        //Load all the images
+        //RGB of the brightest color of the heatmap
+        const RED = 6;
+        const GREEN = 200;
+        const BLUE = 125;
+
+        //Not constants because they need to be initalized later 
+        let WIDTH = 0;                    //Width of all images
+        let HEIGHT = 0;                   //Height of all images
+        let pixel_layer_count_array;      //2D Array (width x height), stores the number of layers of schedules that overlap on that pixel
+
         function waitForImage(img) {
             if (img.complete && img.naturalWidth !== 0) {
                 return Promise.resolve();
@@ -52,47 +63,120 @@
             });
         }
 
+        //Preload all the images
         async function preloadAllImages() {
-            const allImages = [...allScheduleImages, backgroundElement, originalBackground];
-            await Promise.all(allImages.map(waitForImage));
+            const all_images = [...all_schedule_images, rendered_schedule, original_background];
+            await Promise.all(all_images.map(waitForImage));
         }
-
-        let width = 0;
-        let height = 0;
-        let layerCount;
-        let initialized = false;
-
-        const red = 6;
-        const green = 200;
-        const blue = 125;
 
         async function initialize() {
             await preloadAllImages();
-            width = backgroundElement.naturalWidth;
-            height = backgroundElement.naturalHeight;
-            layerCount = new Uint8Array(width * height);
-            layerCount.fill(0);
-
-            initialized = true;
+            WIDTH = rendered_schedule.naturalWidth;
+            HEIGHT = rendered_schedule.naturalHeight;
+            pixel_layer_count_array = new Uint8Array(WIDTH * HEIGHT);
+            pixel_layer_count_array.fill(0);
         }
         initialize();
 
+        //
+        // Initalize Buttons
+        //
+        const container = document.getElementById("allButtons");
 
-        //Keeps track of selected schedules
-        const selectedSchedules = [];
+
+        //Initialize Heatmap Button
+        const heatmap_checkbox = document.createElement("input");
+        let is_heatmap_active = false;
+        heatmap_checkbox.type = "button";
+        heatmap_checkbox.value = "Switch to Heatmap";
+        heatmap_checkbox.addEventListener("click", function() {
+            toggleHeatmap(!is_heatmap_active);
+        });
+
+        async function toggleHeatmap(isActive) {
+            is_heatmap_active = isActive;
+            if (is_heatmap_active == true) {
+                heatmap_checkbox.value = "Switch to Color";
+            }
+            else {
+                heatmap_checkbox.value = "Switch to Heatmap";
+            }
+            await render();
+        }
+
+        container.appendChild(heatmap_checkbox);
+        container.appendChild(document.createElement("br"));
+        container.appendChild(document.createElement("br"));
+        container.appendChild(document.createElement("br"));
+
+
+        //Initialize "Select All" Button
+        const select_all_label = document.createElement("input");
+        select_all_label.type = "button";
+        select_all_label.value = "Select All";
+        select_all_label.addEventListener("click", function() {
+            selectAll();
+        });
+
+        async function selectAll() {
+            for (let i = 1; i <= schedule_directories.length; i++) {
+                const checkbox = document.getElementById(`image${i}`);
+                if (!checkbox.checked) {
+                    checkbox.checked = true;
+                    await updateSelectedSchedules(i, true);
+                }
+            }
+            //No need to call render since it is called in updateSelectedSchedules
+        }
+
+        container.appendChild(select_all_label);
+        container.appendChild(document.createElement("br"));
+        container.appendChild(document.createElement("br"));
+
+        
+        //Initialize "Deselect All" Button
+        const deselect_all_label = document.createElement("input");
+        deselect_all_label.type = "button";
+        deselect_all_label.value = "Deselect All";
+        deselect_all_label.addEventListener("click", function() {
+            deselectAll();
+        });
+
+        async function deselectAll() {
+            pixel_layer_count_array.fill(0);
+            selected_schedules = [];
+
+            for (let i = 1; i <= schedule_directories.length; i++) {
+                const checkbox = document.getElementById(`image${i}`);
+                checkbox.checked = false;
+            }
+
+            await render();
+        }
+
+        container.appendChild(deselect_all_label);
+        container.appendChild(document.createElement("br"));
+        container.appendChild(document.createElement("br"));
+        container.appendChild(document.createElement("br"));
+        container.appendChild(document.createElement("br"));
+
+
+
+
+        //Initialize Schedule Checkboxes
+        //1D Array, stores which schedules are selected (i.e [1,2,4])
+        let selected_schedules = [];
 
         //Names of the schedules (for the checkboxes)
-        const scheduleNames =  ["Freshman Fall", "Freshman Spring",
+        const schedule_names =  ["Freshman Fall", "Freshman Spring",
                                 "Sophomore Fall", "Sophomore Spring",
                                 "Junior Fall", "Junior Spring",
                                 "Senior Fall", "Senior Spring"
         ]
 
                             
-        //Generate checkboxes and put them inside of "scheduleButtons"
-        const numberOfSchedules = scheduleImages.length;
-
-        for (let i = 1; i <= numberOfSchedules; i++) {
+        //Generate checkboxes and put them inside of "allButtons"
+        for (let i = 1; i <= schedule_directories.length; i++) {
             const a_checkbox = document.createElement("input");
 
             a_checkbox.type = "checkbox";
@@ -103,9 +187,9 @@
 
             const label = document.createElement("label");
             label.htmlFor = `image${i}`;
-            label.textContent = scheduleNames[i-1];
-            label.style.fontFamily = "Georgia";
-            label.style.fontSize = '30px';
+            label.textContent = schedule_names[i-1];
+            //label.style.fontFamily = "Georgia";
+            //label.style.fontSize = '30px';
 
             container.appendChild(a_checkbox);
             container.appendChild(label);
@@ -117,17 +201,8 @@
             }
         }
 
-        const heatmap_checkbox = document.createElement("input");
-        let isHeatmapActive = false;
-        heatmap_checkbox.type = "checkbox";
-        heatmap_checkbox.addEventListener("change", function() {
-            toggleHeatmap(heatmap_checkbox.checked);
-        });
-
-        async function toggleHeatmap(isChecked) {
-            isHeatmapActive = isChecked;
-
-            if (isHeatmapActive == true) {
+        async function render() {
+            if (is_heatmap_active == true) {
                 await renderHeatmap();
             }
             else {
@@ -135,36 +210,20 @@
             }
         }
 
-        const heatmapLabel = document.createElement("label");
-        heatmapLabel.textContent =  "Heatmap";
-        heatmapLabel.style.fontFamily = "Georgia";
-        heatmapLabel.style.fontSize = '30px';
-
-        container.appendChild(heatmap_checkbox);
-        container.appendChild(heatmapLabel);
-        container.appendChild(document.createElement("br"));
-        container.appendChild(document.createElement("br"));
-
         //Updates list of schedules everytime a checkbox is clicked
         async function updateSelectedSchedules(scheduleNumber, isChecked) {
             if (isChecked) {
-                selectedSchedules.push(scheduleNumber);
+                selected_schedules.push(scheduleNumber);
             }
             else {
-                const index = selectedSchedules.indexOf(scheduleNumber);
+                const index = selected_schedules.indexOf(scheduleNumber);
                 if (index !== -1) {
-                    selectedSchedules.splice(index, 1);
+                    selected_schedules.splice(index, 1);
                 }
             }
 
-
             await updateLayerCount(scheduleNumber, isChecked);
-            if (isHeatmapActive == true) {
-                await renderHeatmap();
-            }
-            else {
-                await renderColor();
-            }
+            await render();
         }
 
         async function updateLayerCount(scheduleNumber, wasAdded) {
@@ -173,23 +232,23 @@
                 update = 1;
             }
 
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = width;
-            tempCanvas.height = height;
-            const tempCtx = tempCanvas.getContext('2d');
+            const temp_canvas = document.createElement('canvas');
+            temp_canvas.width = WIDTH;
+            temp_canvas.height = HEIGHT;
+            const temp_ctx = temp_canvas.getContext('2d');
 
-            const scheduleImage = allScheduleImages[scheduleNumber - 1];
-            await waitForImage(scheduleImage);
+            const a_schedule_image = all_schedule_images[scheduleNumber - 1];
+            await waitForImage(a_schedule_image);
 
-            tempCtx.clearRect(0, 0, width, height);
-            tempCtx.drawImage(scheduleImage, 0, 0, width, height);
-            const overlayData = tempCtx.getImageData(0, 0, width, height).data;
+            temp_ctx.clearRect(0, 0, WIDTH, HEIGHT);
+            temp_ctx.drawImage(a_schedule_image, 0, 0, WIDTH, HEIGHT);
+            const overlayData = temp_ctx.getImageData(0, 0, WIDTH, HEIGHT).data;
 
-            for (let y = 0, p = 0; y < height; y++) {
-                for (let x = 0; x < width; x++, p++) {
+            for (let y = 0, p = 0; y < HEIGHT; y++) {
+                for (let x = 0; x < WIDTH; x++, p++) {
                     const alpha = overlayData[(p * 4) + 3];
                     if (alpha >= 250) {
-                        layerCount[p] = layerCount[p] + update;
+                        pixel_layer_count_array[p] = pixel_layer_count_array[p] + update;
                     }
                 }
             }
@@ -198,77 +257,77 @@
         }
 
         async function renderHeatmap() {
-            const overlayCanvas = document.createElement('canvas');
-            overlayCanvas.width = width;
-            overlayCanvas.height = height;
+            const overlay_canvas = document.createElement('canvas');
+            overlay_canvas.width = WIDTH;
+            overlay_canvas.height = HEIGHT;
 
-            const overlayCtx = overlayCanvas.getContext('2d');
-            const overlayImageData = overlayCtx.createImageData(width, height);
-            const overlayPixels = overlayImageData.data;
+            const overlay_ctx = overlay_canvas.getContext('2d');
+            const overlay_image_data = overlay_ctx.createImageData(WIDTH, HEIGHT);
+            const overlay_pixels = overlay_image_data.data;
             
             //It's capped at 6 because my schedule has no time where more than 6 classes overlap
-            let maxLayers = selectedSchedules.length;
-            if (selectedSchedules.length > 6) {
-                maxLayers = 6;
+            let max_layers = selected_schedules.length;
+            if (selected_schedules.length > 6) {
+                max_layers = 6;
             }
 
-            //Pre-compute the blended heatmap based on layerCount
+            //Pre-compute the blended heatmap based on pixel_layer_count_array
             const colors = [];
-            for (let c = 0; c < maxLayers; c++) {
-                let this_Red   = (red   / maxLayers) * (c+1);
-                let this_Green = (green / maxLayers) * (c+1);
-                let this_Blue  = (blue  / maxLayers) * (c+1);
+            for (let c = 0; c < max_layers; c++) {
+                let this_red   = (RED   / max_layers) * (c+1);
+                let this_green = (GREEN / max_layers) * (c+1);
+                let this_blue  = (BLUE  / max_layers) * (c+1);
 
-                colors[c] = [this_Red, this_Green, this_Blue];
+                colors[c] = [this_red, this_green, this_blue];
             }
 
-            for (let i = 0; i < layerCount.length; i++) {
-                const count = layerCount[i];
+            for (let i = 0; i < pixel_layer_count_array.length; i++) {
+                const count = pixel_layer_count_array[i];
 
                 if (count <= 0) {
                     //Skip pixels with no layers
                     continue; 
                 }
 
-                const pixelIndex = i * 4;
-                overlayPixels[pixelIndex + 0] = colors[count - 1][0];
-                overlayPixels[pixelIndex + 1] = colors[count - 1][1];
-                overlayPixels[pixelIndex + 2] = colors[count - 1][2];
-                overlayPixels[pixelIndex + 3] = 255;
+                const pixel_index = i * 4;
+                overlay_pixels[pixel_index + 0] = colors[count - 1][0];
+                overlay_pixels[pixel_index + 1] = colors[count - 1][1];
+                overlay_pixels[pixel_index + 2] = colors[count - 1][2];
+                overlay_pixels[pixel_index + 3] = 255;
             }
 
             //Update the canvas with the rendered result
-            overlayCtx.putImageData(overlayImageData, 0, 0);
+            overlay_ctx.putImageData(overlay_image_data, 0, 0);
             
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
+            const final_canvas = document.createElement('canvas');
+            final_canvas.width = WIDTH;
+            final_canvas.height = HEIGHT;
+            const final_ctx = final_canvas.getContext('2d');
 
-            //Draw the original background first, then overlay the blended schedules on top.
-            ctx.drawImage(originalBackground, 0, 0);
-            ctx.drawImage(overlayCanvas, 0, 0);
-            ctx.globalAlpha = 1;
-            backgroundElement.src = canvas.toDataURL();
+            //Draw the original background first, then overlay the blended schedules on top
+            final_ctx.drawImage(original_background, 0, 0);
+            final_ctx.drawImage(overlay_canvas, 0, 0);
+            final_ctx.globalAlpha = 1;
+            rendered_schedule.src = final_canvas.toDataURL();
         }
 
         async function renderColor() {
             const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
+            canvas.width = WIDTH;
+            canvas.height = HEIGHT;
             const ctx = canvas.getContext('2d');
 
-            // Draw the base background first.
-            ctx.drawImage(originalBackground, 0, 0, width, height);
+            // Draw the base background first
+            ctx.drawImage(original_background, 0, 0, WIDTH, HEIGHT);
 
             // Draw each selected schedule image on top of the background.
-            for (const scheduleNumber of selectedSchedules) {
-                const scheduleImage = allScheduleImages[scheduleNumber - 1];
+            for (const scheduleNumber of selected_schedules) {
+                const scheduleImage = all_schedule_images[scheduleNumber - 1];
                 await waitForImage(scheduleImage);
-                ctx.drawImage(scheduleImage, 0, 0, width, height);
+                ctx.drawImage(scheduleImage, 0, 0, WIDTH, HEIGHT);
             }
 
-            backgroundElement.src = canvas.toDataURL();
+            rendered_schedule.src = canvas.toDataURL();
         }
 
         </script>

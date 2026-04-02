@@ -28,3 +28,12 @@ img {
     max-width: 500px;
     height: auto;
 }
+
+.buttons input {
+    font-family: Georgia, serif;
+    font-size: 20px;
+}
+.buttons label {
+    font-family: Georgia, serif;
+    font-size: 25px;
+}
